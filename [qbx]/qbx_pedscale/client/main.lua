@@ -51,17 +51,38 @@ local function applyScale(scale)
 
     local ped = PlayerPedId()
     
-    -- Verificar se a native SetPedScale existe (requer build 2189+)
-    -- Usar pcall para verificar se a função existe
-    local success, result = pcall(function()
-        return SetPedScale(ped, scale)
+    -- Verificar se a native SetPedScale existe
+    if not SetPedScale then
+        print("^1[ERROR] SetPedScale não existe nesta versão do FiveM^7")
+        Notify("SetPedScale não está disponível. Requer FiveM build 2189+ com OneSync", 'error')
+        return scale
+    end
+    
+    -- Tentar aplicar a escala
+    local success, err = pcall(function()
+        SetPedScale(ped, scale)
     end)
     
     if not success then
-        -- SetPedScale não está disponível
-        print(string.format("^3[WARNING] SetPedScale não está disponível. Requer FiveM build 2189+ com OneSync ativado^7"))
-        Notify("SetPedScale não está disponível. Requer FiveM build 2189+ com OneSync", 'error')
+        -- SetPedScale falhou
+        print(string.format("^1[ERROR] SetPedScale falhou: %s^7", tostring(err)))
+        print("^3[INFO] Verifica se:")
+        print("  - Build do FiveM é 2189 ou superior (digita 'version' no console)")
+        print("  - OneSync está ativado")
+        print("  - OneSync Infinity está ativado (recomendado)^7")
+        Notify("Erro ao aplicar escala. Verifica console do servidor.", 'error')
         return scale
+    end
+    
+    -- Verificar se a escala foi aplicada (se GetPedScale existir)
+    Wait(100)
+    if GetPedScale then
+        local currentPedScale = GetPedScale(ped)
+        if currentPedScale and math.abs(currentPedScale - scale) > 0.01 then
+            print(string.format("^3[WARNING] Escala não foi aplicada corretamente. Esperado: %.2f, Atual: %.2f^7", scale, currentPedScale))
+        else
+            print(string.format("^2[SUCCESS] Escala aplicada: %.2f^7", scale))
+        end
     end
     
     currentScale = scale
@@ -188,6 +209,60 @@ RegisterCommand('setscaleinput', function()
 end, false)
 
 -- Evento do servidor para aplicar escala (admin) - removido, não é necessário
+
+-- Verificar disponibilidade do SetPedScale ao iniciar
+CreateThread(function()
+    Wait(2000) -- Aguardar recursos carregarem
+    
+    if SetPedScale then
+        print("^2[SUCCESS] SetPedScale está disponível^7")
+        local ped = PlayerPedId()
+        local testScale = GetPedScale(ped)
+        print(string.format("^2[INFO] Escala atual do ped: %.2f^7", testScale or 0))
+    else
+        print("^1[ERROR] SetPedScale NÃO está disponível^7")
+        print("^3[INFO] Verifica:")
+        print("  - Build do FiveM: deve ser 2189+")
+        print("  - OneSync: deve estar ativado")
+        print("  - Digita 'version' no console do servidor para verificar^7")
+    end
+end)
+
+-- Verificar disponibilidade do SetPedScale ao iniciar
+CreateThread(function()
+    Wait(3000) -- Aguardar recursos carregarem
+    
+    print("^5[DEBUG] Verificando disponibilidade do SetPedScale...^7")
+    
+    if SetPedScale then
+        print("^2[SUCCESS] SetPedScale está disponível^7")
+        local ped = PlayerPedId()
+        if GetPedScale then
+            local testScale = GetPedScale(ped)
+            print(string.format("^2[INFO] Escala atual do ped: %.2f^7", testScale or 0))
+        end
+        
+        -- Verificar versão do FiveM
+        local version = GetConvar('version', '')
+        local buildNumber = version:match('v%d+%.%d+%.%d+%.(%d+)')
+        if buildNumber then
+            local build = tonumber(buildNumber)
+            if build then
+                if build >= 2189 then
+                    print(string.format("^2[INFO] Build do FiveM: %d (compatível)^7", build))
+                else
+                    print(string.format("^3[WARNING] Build do FiveM: %d (requer 2189+)^7", build))
+                end
+            end
+        end
+    else
+        print("^1[ERROR] SetPedScale NÃO está disponível^7")
+        print("^3[INFO] Verifica:")
+        print("  - Build do FiveM: deve ser 2189+ (digita 'version' no console do servidor)")
+        print("  - OneSync: deve estar ativado")
+        print("  - OneSync Infinity: recomendado (até 2048 jogadores)^7")
+    end
+end)
 
 -- Carregar escala ao spawnar
 AddEventHandler('QBCore:Client:OnPlayerLoaded', function()
