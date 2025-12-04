@@ -1,0 +1,7 @@
+{
+    "enableAntiMeta": false,
+    "ragdollTime": 1000,
+    "ragdollTimeVariation": 1000,
+    "ragdollType": 3,
+    "cooldownTime": 1200
+}

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PolyZone Clipboard</title>
+</head>
+<body>
+    <textarea id="clipboard" style="position: absolute; left: -9999px;"></textarea>
+    <script>
+        window.addEventListener('message', function(event) {
+            if (event.data.type === "copyToClipboard") {
+                const textarea = document.getElementById('clipboard');
+                textarea.value = event.data.text;
+                textarea.select();
+                textarea.setSelectionRange(0, 99999);
+                
+                try {
+                    document.execCommand('copy');
+                    console.log('Copied to clipboard successfully');
+                } catch (err) {
+                    console.error('Failed to copy:', err);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+

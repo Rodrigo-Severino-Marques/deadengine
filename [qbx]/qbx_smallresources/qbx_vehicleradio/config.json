@@ -1,0 +1,5 @@
+{
+    "disableRadioByDefault": true,
+    "toggleCommand": "togglevehradio",
+    "toggleKey": ""
+}
