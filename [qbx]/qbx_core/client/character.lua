@@ -413,60 +413,60 @@ local function chooseCharacter()
             },
             icon = 'user',
             onSelect = function()
-                lib.showContext('qbx_core_multichar_character_'..i)
-                previewPed(character.citizenid)
+                    lib.showContext('qbx_core_multichar_character_'..i)
+                    previewPed(character.citizenid)
             end
         }
 
-        lib.registerContext({
-            id = 'qbx_core_multichar_character_'..i,
-            title = ('%s %s - %s'):format(character.charinfo.firstname, character.charinfo.lastname, character.citizenid),
-            canClose = false,
-            menu = 'qbx_core_multichar_characters',
-            options = {
-                {
-                    title = locale('info.play'),
-                    description = locale('info.play_description', name),
-                    icon = 'play',
-                    onSelect = function()
-                        DoScreenFadeOut(10)
-                        lib.callback.await('qbx_core:server:loadCharacter', false, character.citizenid)
-                        if GetResourceState('qbx_apartments'):find('start') then
-                            TriggerEvent('apartments:client:setupSpawnUI', character.citizenid)
-                        elseif GetResourceState('qbx_spawn'):find('start') then
-                            TriggerEvent('qb-spawn:client:setupSpawns', character.citizenid)
-                            TriggerEvent('qb-spawn:client:openUI', true)
-                        else
-                            spawnLastLocation()
-                        end
-                        destroyPreviewCam()
-                    end
-                },
-                config.characters.enableDeleteButton and {
-                    title = locale('info.delete_character'),
-                    description = locale('info.delete_character_description', name),
-                    icon = 'trash',
-                    onSelect = function()
-                        local alert = lib.alertDialog({
-                            header = locale('info.delete_character'),
-                            content = locale('info.confirm_delete'),
-                            centered = true,
-                            cancel = true
-                        })
-                        if alert == 'confirm' then
-                            local success = lib.callback.await('qbx_core:server:deleteCharacter', false, character.citizenid)
-                            Notify(success and locale('success.character_deleted') or locale('error.character_delete_failed'), success and 'success' or 'error')
-
+            lib.registerContext({
+                id = 'qbx_core_multichar_character_'..i,
+                title = ('%s %s - %s'):format(character.charinfo.firstname, character.charinfo.lastname, character.citizenid),
+                canClose = false,
+                menu = 'qbx_core_multichar_characters',
+                options = {
+                    {
+                        title = locale('info.play'),
+                        description = locale('info.play_description', name),
+                        icon = 'play',
+                        onSelect = function()
+                            DoScreenFadeOut(10)
+                            lib.callback.await('qbx_core:server:loadCharacter', false, character.citizenid)
+                            if GetResourceState('qbx_apartments'):find('start') then
+                                TriggerEvent('apartments:client:setupSpawnUI', character.citizenid)
+                            elseif GetResourceState('qbx_spawn'):find('start') then
+                                TriggerEvent('qb-spawn:client:setupSpawns', character.citizenid)
+                                TriggerEvent('qb-spawn:client:openUI', true)
+                            else
+                                spawnLastLocation()
+                            end
                             destroyPreviewCam()
-                            chooseCharacter()
-                        else
-                            lib.showContext('qbx_core_multichar_character_'..i)
                         end
-                    end
-                } or nil
-            }
-        })
-    end
+                    },
+                    config.characters.enableDeleteButton and {
+                        title = locale('info.delete_character'),
+                        description = locale('info.delete_character_description', name),
+                        icon = 'trash',
+                        onSelect = function()
+                            local alert = lib.alertDialog({
+                                header = locale('info.delete_character'),
+                                content = locale('info.confirm_delete'),
+                                centered = true,
+                                cancel = true
+                            })
+                            if alert == 'confirm' then
+                                local success = lib.callback.await('qbx_core:server:deleteCharacter', false, character.citizenid)
+                                Notify(success and locale('success.character_deleted') or locale('error.character_delete_failed'), success and 'success' or 'error')
+
+                                destroyPreviewCam()
+                                chooseCharacter()
+                            else
+                                lib.showContext('qbx_core_multichar_character_'..i)
+                            end
+                        end
+                    } or nil
+                }
+            })
+        end
     
     -- Always add a "Create New Character" option at the end
     local nextSlot = characterCount + 1
@@ -479,7 +479,7 @@ local function chooseCharacter()
 
             previewPed(firstCharacterCitizenId)
             lib.showContext('qbx_core_multichar_characters')
-        end
+    end
     }
 
     lib.registerContext({

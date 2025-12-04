@@ -64,7 +64,14 @@ local function scaleToCm(scale)
 end
 
 -- Função para aplicar escala usando SetEntityMatrix (fallback)
+-- AVISO: Este método pode causar problemas visuais e não é recomendado
 local function applyScaleMatrix(ped, scale)
+    -- Desativar SetEntityMatrix - causa problemas de duplicação
+    -- Usar apenas SetPedScale se disponível
+    return false
+    
+    -- CÓDIGO ANTIGO (DESATIVADO - CAUSA DUPLICAÇÃO):
+    --[[
     if not GetEntityMatrix or not SetEntityMatrix then
         return false
     end
@@ -93,6 +100,7 @@ local function applyScaleMatrix(ped, scale)
     end)
     
     return setSuccess
+    --]]
 end
 
 -- Função para aplicar escala com limites
@@ -130,11 +138,12 @@ local function applyScale(scale)
         end
     end
     
-    -- Se SetPedScale não funcionou, usar Matrix fallback
-    if not success and useMatrixFallback then
-        success = applyScaleMatrix(ped, scale)
-        if success then
-            print(string.format("^3[INFO] Escala aplicada usando SetEntityMatrix: %.2f^7", scale))
+    -- NÃO usar SetEntityMatrix - causa problemas de duplicação visual
+    -- Se SetPedScale não funcionou, avisar o utilizador
+    if not success then
+        if useMatrixFallback then
+            print("^1[ERROR] SetPedScale não está disponível e SetEntityMatrix foi desativado (causa duplicação visual)^7")
+            print("^3[INFO] Por favor, atualiza o servidor para build 2189+ para usar SetPedScale^7")
         end
     end
     
@@ -359,22 +368,181 @@ AddEventHandler('gameEventTriggered', function(name, args)
     end
 end)
 
--- Aplicar escala periodicamente (para garantir sincronização)
+-- Aplicar escala continuamente (para garantir que não para)
+-- IMPORTANTE: Aplicar apenas uma vez por ped para evitar duplicações
+local lastAppliedScale = Config.DefaultScale
+local lastAppliedPed = 0
+
 CreateThread(function()
     while true do
-        Wait(5000)
-        if currentScale ~= Config.DefaultScale then
-            local ped = PlayerPedId()
-            if DoesEntityExist(ped) then
+        Wait(Config.UpdateInterval)
+        local ped = PlayerPedId()
+        if DoesEntityExist(ped) and ped ~= 0 then
+            local scaleToApply = isMenuOpen and previewScale or currentScale
+            
+            -- Só aplicar se mudou ou se é um ped diferente
+            if (scaleToApply ~= lastAppliedScale or ped ~= lastAppliedPed) and scaleToApply ~= Config.DefaultScale then
+                -- Usar APENAS SetPedScale - SetEntityMatrix causa duplicação
+                if useSetPedScale and SetPedScale and type(SetPedScale) == "function" then
+                    local success = pcall(function()
+                        SetPedScale(ped, scaleToApply)
+                    end)
+                    if success then
+                        lastAppliedScale = scaleToApply
+                        lastAppliedPed = ped
+                    end
+                -- NÃO usar SetEntityMatrix - causa problemas de duplicação visual
+                -- elseif useMatrixFallback then
+                --     applyScaleMatrix(ped, scaleToApply)
+                end
+            elseif scaleToApply == Config.DefaultScale and lastAppliedScale ~= Config.DefaultScale then
+                -- Resetar para escala padrão
                 if useSetPedScale and SetPedScale and type(SetPedScale) == "function" then
                     pcall(function()
-                        SetPedScale(ped, currentScale)
+                        SetPedScale(ped, Config.DefaultScale)
                     end)
-                elseif useMatrixFallback then
-                    applyScaleMatrix(ped, currentScale)
+                    lastAppliedScale = Config.DefaultScale
+                    lastAppliedPed = ped
                 end
             end
         end
     end
 end)
+
+-- Menu Avançado de Escala com Barra Deslizante (NUI)
+local isMenuOpen = false
+local previewScale = currentScale
+local useNUI = true -- Usar NUI em vez de menu de contexto
+
+-- Função para aplicar escala em tempo real (preview - não guarda)
+local function applyPreviewScale(scale, silent)
+    local ped = PlayerPedId()
+    if not DoesEntityExist(ped) then return end
+    
+    -- Limitar escala
+    if scale < Config.MinScale then scale = Config.MinScale end
+    if scale > Config.MaxScale then scale = Config.MaxScale end
+    
+    -- Aplicar escala APENAS com SetPedScale - SetEntityMatrix causa duplicação
+    if useSetPedScale and SetPedScale and type(SetPedScale) == "function" then
+        pcall(function()
+            SetPedScale(ped, scale)
+        end)
+    -- NÃO usar SetEntityMatrix - causa problemas de duplicação visual
+    -- elseif useMatrixFallback then
+    --     applyScaleMatrix(ped, scale)
+    end
+    
+    previewScale = scale
+end
+
+-- Thread para manter escala aplicada continuamente enquanto o menu está aberto
+-- REMOVIDO - A thread principal já faz isto, evitar duplicação
+-- CreateThread(function()
+--     while true do
+--         Wait(Config.UpdateInterval)
+--         if isMenuOpen then
+--             applyPreviewScale(previewScale, true)
+--         end
+--     end
+-- end)
+
+-- Thread para atualizar NUI com valores atuais
+CreateThread(function()
+    while true do
+        Wait(100)
+        if isMenuOpen then
+            SendNUIMessage({
+                type = 'update',
+                scale = previewScale
+            })
+        end
+    end
+end)
+
+-- Abrir menu NUI avançado de escala
+local function openScaleMenu()
+    if isMenuOpen then return end
+    
+    isMenuOpen = true
+    previewScale = currentScale
+    
+    -- Abrir NUI
+    SetNuiFocus(true, true)
+    SendNUIMessage({
+        type = 'open',
+        scale = currentScale,
+        minScale = Config.MinScale,
+        maxScale = Config.MaxScale,
+        defaultHeight = Config.DefaultHeight
+    })
+    
+    -- Thread para fechar menu se ESC for pressionado
+    CreateThread(function()
+        while isMenuOpen do
+            Wait(0)
+            if IsControlJustPressed(0, 322) then -- ESC
+                closeScaleMenu(true)
+                break
+            end
+        end
+    end)
+end
+
+-- Fechar menu NUI
+local function closeScaleMenu(cancelled)
+    if not isMenuOpen then return end
+    
+    isMenuOpen = false
+    SetNuiFocus(false, false)
+    SendNUIMessage({
+        type = 'close'
+    })
+    
+    if cancelled then
+        applyPreviewScale(currentScale, true)
+        Wait(100)
+        applyScale(currentScale)
+        Notify('Alterações canceladas', 'inform')
+    end
+end
+
+-- Callbacks NUI
+RegisterNUICallback('updateScale', function(data, cb)
+    if data.scale then
+        previewScale = math.max(Config.MinScale, math.min(Config.MaxScale, data.scale))
+        applyPreviewScale(previewScale)
+    end
+    cb('ok')
+end)
+
+RegisterNUICallback('confirmScale', function(data, cb)
+    if data.scale then
+        local finalScale = math.max(Config.MinScale, math.min(Config.MaxScale, data.scale))
+        applyScale(finalScale)
+        Notify(Config.Messages.scale_set:format(scaleToCm(finalScale), finalScale), 'success')
+    end
+    closeScaleMenu(false)
+    cb('ok')
+end)
+
+RegisterNUICallback('cancelScale', function(data, cb)
+    closeScaleMenu(true)
+    cb('ok')
+end)
+
+-- Comando para abrir menu
+RegisterCommand('scalemenu', function()
+    if not Config.EnableMenu then
+        Notify('Menu de escala desativado', 'error')
+        return
+    end
+    
+    openScaleMenu()
+end, false)
+
+-- Tecla para abrir menu (se configurado)
+if Config.MenuKey and Config.MenuKey ~= false then
+    RegisterKeyMapping('scalemenu', 'Abrir Menu de Escala', 'keyboard', Config.MenuKey)
+end
 

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escala de Personagem</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: transparent;
+        }
+
+        #scaleMenu {
+            display: none;
+        }
+
+        .scale-menu {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            min-width: 400px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .menu-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .menu-header h1 {
+            color: #fff;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .menu-header p {
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        .scale-control {
+            margin-bottom: 25px;
+        }
+
+        .scale-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            color: #fff;
+            font-size: 16px;
+        }
+
+        .scale-value {
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .slider-container {
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        .slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .slider:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(76, 175, 80, 0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 3px 15px rgba(76, 175, 80, 0.7);
+        }
+
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 10px rgba(76, 175, 80, 0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .slider::-moz-range-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 3px 15px rgba(76, 175, 80, 0.7);
+        }
+
+        .slider-track {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            height: 8px;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            border-radius: 5px;
+            transform: translateY(-50%);
+            pointer-events: none;
+            transition: width 0.1s;
+        }
+
+        .scale-info {
+            display: flex;
+            justify-content: space-between;
+            color: #aaa;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .btn-confirm {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+        }
+
+        .btn-confirm:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .btn-cancel {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            color: white;
+        }
+
+        .btn-cancel:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4);
+        }
+
+        .btn-reset {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #FF9800, #F57C00);
+            color: white;
+        }
+
+        .btn-reset:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 152, 0, 0.4);
+        }
+
+        .instructions {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            color: #aaa;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .instructions strong {
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="scale-menu" id="scaleMenu">
+        <div class="menu-header">
+            <h1>🎯 Ajustar Escala</h1>
+            <p>Altera o tamanho do teu personagem</p>
+        </div>
+
+        <div class="scale-control">
+            <div class="scale-label">
+                <span>Escala</span>
+                <span class="scale-value" id="scaleValue">1.00</span>
+            </div>
+            <div class="slider-container">
+                <div class="slider-track" id="sliderTrack"></div>
+                <input type="range" class="slider" id="scaleSlider" min="30" max="200" value="100" step="1">
+            </div>
+            <div class="scale-info">
+                <span id="minScale">0.30</span>
+                <span id="maxScale">2.00</span>
+            </div>
+        </div>
+
+        <div class="scale-control">
+            <div class="scale-label">
+                <span>Altura (cm)</span>
+                <span class="scale-value" id="heightValue">180 cm</span>
+            </div>
+            <div class="slider-container">
+                <div class="slider-track" id="heightTrack"></div>
+                <input type="range" class="slider" id="heightSlider" min="54" max="360" value="180" step="1">
+            </div>
+            <div class="scale-info">
+                <span id="minHeight">54 cm</span>
+                <span id="maxHeight">360 cm</span>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button class="btn btn-reset" id="resetBtn">🔄 Resetar</button>
+            <button class="btn btn-confirm" id="confirmBtn">✅ Confirmar</button>
+            <button class="btn btn-cancel" id="cancelBtn">❌ Cancelar</button>
+        </div>
+
+        <div class="instructions">
+            <strong>Instruções:</strong><br>
+            • Arrasta a barra para ajustar a escala<br>
+            • As alterações são visíveis em tempo real<br>
+            • Usa as setas do teclado para ajustes finos<br>
+            • Pressiona ESC para cancelar
+        </div>
+    </div>
+
+    <script>
+        const scaleSlider = document.getElementById('scaleSlider');
+        const heightSlider = document.getElementById('heightSlider');
+        const scaleValue = document.getElementById('scaleValue');
+        const heightValue = document.getElementById('heightValue');
+        const sliderTrack = document.getElementById('sliderTrack');
+        const heightTrack = document.getElementById('heightTrack');
+        const confirmBtn = document.getElementById('confirmBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const resetBtn = document.getElementById('resetBtn');
+
+        let currentScale = 1.0;
+        let minScale = 0.3;
+        let maxScale = 2.0;
+        let defaultHeight = 180;
+
+        // Atualizar track visual
+        function updateTrack(slider, track) {
+            const value = slider.value;
+            const min = slider.min;
+            const max = slider.max;
+            const percent = ((value - min) / (max - min)) * 100;
+            track.style.width = percent + '%';
+        }
+
+        // Converter escala para altura em cm
+        function scaleToCm(scale) {
+            return Math.round(scale * defaultHeight);
+        }
+
+        // Converter altura em cm para escala
+        function cmToScale(cm) {
+            return cm / defaultHeight;
+        }
+
+        // Atualizar escala
+        function updateScale(scale) {
+            currentScale = Math.max(minScale, Math.min(maxScale, scale));
+            scaleValue.textContent = currentScale.toFixed(2);
+            heightValue.textContent = scaleToCm(currentScale) + ' cm';
+            
+            // Atualizar sliders
+            scaleSlider.value = Math.round(currentScale * 100);
+            heightSlider.value = scaleToCm(currentScale);
+            
+            updateTrack(scaleSlider, sliderTrack);
+            updateTrack(heightSlider, heightTrack);
+            
+            // Enviar para o jogo
+            fetch(`https://qbx_pedscale/updateScale`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ scale: currentScale })
+            });
+        }
+
+        // Event listeners
+        scaleSlider.addEventListener('input', (e) => {
+            const scale = e.target.value / 100;
+            updateScale(scale);
+        });
+
+        heightSlider.addEventListener('input', (e) => {
+            const cm = parseInt(e.target.value);
+            const scale = cmToScale(cm);
+            updateScale(scale);
+        });
+
+        confirmBtn.addEventListener('click', () => {
+            fetch(`https://qbx_pedscale/confirmScale`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ scale: currentScale })
+            });
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            fetch(`https://qbx_pedscale/cancelScale`, {
+                method: 'POST'
+            });
+        });
+
+        resetBtn.addEventListener('click', () => {
+            updateScale(1.0);
+        });
+
+        // Inicializar
+        updateTrack(scaleSlider, sliderTrack);
+        updateTrack(heightSlider, heightTrack);
+
+        // Listener para receber dados do jogo
+        window.addEventListener('message', (event) => {
+            const data = event.data;
+            
+            if (data.type === 'open') {
+                currentScale = data.scale || 1.0;
+                minScale = data.minScale || 0.3;
+                maxScale = data.maxScale || 2.0;
+                defaultHeight = data.defaultHeight || 180;
+                
+                scaleSlider.min = Math.round(minScale * 100);
+                scaleSlider.max = Math.round(maxScale * 100);
+                heightSlider.min = scaleToCm(minScale);
+                heightSlider.max = scaleToCm(maxScale);
+                
+                document.getElementById('minScale').textContent = minScale.toFixed(2);
+                document.getElementById('maxScale').textContent = maxScale.toFixed(2);
+                document.getElementById('minHeight').textContent = scaleToCm(minScale) + ' cm';
+                document.getElementById('maxHeight').textContent = scaleToCm(maxScale) + ' cm';
+                
+                updateScale(currentScale);
+                document.getElementById('scaleMenu').style.display = 'block';
+            } else if (data.type === 'close') {
+                document.getElementById('scaleMenu').style.display = 'none';
+            } else if (data.type === 'update') {
+                updateScale(data.scale);
+            }
+        });
+
+        // Fechar com ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                cancelBtn.click();
+            }
+        });
+    </script>
+</body>
+</html>
+
