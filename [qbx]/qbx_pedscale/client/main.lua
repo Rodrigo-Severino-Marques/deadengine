@@ -1,9 +1,34 @@
 local QBCore = exports['qbx_core']
 local PlayerData = {}
 local currentScale = Config.DefaultScale
+local useSetPedScale = false -- Será definido após verificação
+local useMatrixFallback = false -- Será definido após verificação
 
 -- Verificar se ox_lib está disponível
 local hasOxLib = GetResourceState('ox_lib') == 'started'
+
+-- Verificar qual método de escala está disponível
+CreateThread(function()
+    Wait(2000)
+    
+    -- Verificar SetPedScale primeiro
+    if Config.UseSetPedScale and SetPedScale and type(SetPedScale) == "function" then
+        useSetPedScale = true
+        print("^2[INFO] Usando SetPedScale (método oficial)^7")
+    elseif Config.UseMatrixFallback then
+        useMatrixFallback = true
+        if Config.MatrixWarning then
+            print("^3[WARNING] SetPedScale não disponível. Usando SetEntityMatrix (método alternativo)^7")
+            print("^3[INFO] Limitações do método Matrix:")
+            print("  - Hitbox não muda (podes passar por portas pequenas)")
+            print("  - Colisões podem falhar")
+            print("  - Armas podem ficar desproporcionadas")
+            print("  - Podes ter problemas com veículos^7")
+        end
+    else
+        print("^1[ERROR] Nenhum método de escala disponível^7")
+    end
+end)
 
 -- Função helper para notificações (compatível com QBX)
 local function Notify(message, type)
@@ -52,11 +77,18 @@ local function applyScale(scale)
     local ped = PlayerPedId()
     
     -- Verificar se a native SetPedScale existe e é uma função
+    if SetPedScale == nil then
+        print("^1[ERROR] SetPedScale é nil (não existe)^7")
+        print("^3[INFO] Build do servidor: 22934 (compatível)^7")
+        print("^3[SOLUÇÃO]: FECHA o FiveM completamente e abre novamente^7")
+        Notify("SetPedScale não disponível. Fecha e abre o FiveM novamente.", 'error')
+        return scale
+    end
+    
     if type(SetPedScale) ~= "function" then
-        print("^1[ERROR] SetPedScale não existe ou não é uma função^7")
-        print("^3[INFO] Build atual: 22934 (deve funcionar)^7")
-        print("^3[SOLUÇÃO]: Reconecta ao servidor (sai e entra novamente)^7")
-        Notify("SetPedScale não disponível. Reconecta ao servidor.", 'error')
+        print(string.format("^1[ERROR] SetPedScale não é função (tipo: %s)^7", type(SetPedScale)))
+        print("^3[SOLUÇÃO]: FECHA o FiveM completamente e abre novamente^7")
+        Notify("SetPedScale não disponível. Fecha e abre o FiveM novamente.", 'error')
         return scale
     end
     
@@ -219,6 +251,8 @@ CreateThread(function()
     
     -- Verificar versão do FiveM primeiro
     local version = GetConvar('version', '')
+    print(string.format("^5[DEBUG] Versão completa: %s^7", version))
+    
     local buildNumber = version:match('v%d+%.%d+%.%d+%.(%d+)')
     if buildNumber then
         local build = tonumber(buildNumber)
@@ -228,27 +262,50 @@ CreateThread(function()
             else
                 print(string.format("^3[WARNING] Build do FiveM: %d (requer 2189+)^7", build))
             end
-        end
-    end
-    
-    -- Verificar se SetPedScale existe
-    if type(SetPedScale) == "function" then
-        print("^2[SUCCESS] SetPedScale está disponível^7")
-        local ped = PlayerPedId()
-        if GetPedScale and type(GetPedScale) == "function" then
-            local testScale = GetPedScale(ped)
-            print(string.format("^2[INFO] Escala atual do ped: %.2f^7", testScale or 0))
+        else
+            print("^3[WARNING] Não foi possível extrair número da build^7")
         end
     else
-        print("^1[ERROR] SetPedScale NÃO está disponível^7")
+        print("^3[WARNING] Não foi possível encontrar build na versão^7")
+    end
+    
+    -- Verificar se SetPedScale existe de várias formas
+    print("^5[DEBUG] Verificando SetPedScale...^7")
+    print(string.format("^5[DEBUG] type(SetPedScale): %s^7", type(SetPedScale)))
+    
+    if SetPedScale ~= nil then
+        if type(SetPedScale) == "function" then
+            print("^2[SUCCESS] SetPedScale está disponível como função^7")
+            
+            -- Testar se funciona
+            local ped = PlayerPedId()
+            local testSuccess, testErr = pcall(function()
+                SetPedScale(ped, 1.0) -- Testar com escala normal
+            end)
+            
+            if testSuccess then
+                print("^2[SUCCESS] SetPedScale funciona corretamente!^7")
+                if GetPedScale and type(GetPedScale) == "function" then
+                    local testScale = GetPedScale(ped)
+                    print(string.format("^2[INFO] Escala atual do ped: %.2f^7", testScale or 0))
+                end
+            else
+                print(string.format("^1[ERROR] SetPedScale existe mas falhou: %s^7", tostring(testErr)))
+            end
+        else
+            print(string.format("^1[ERROR] SetPedScale existe mas não é função (tipo: %s)^7", type(SetPedScale)))
+        end
+    else
+        print("^1[ERROR] SetPedScale é nil (não existe)^7")
         print("^3[INFO] Possíveis causas:")
-        print("  - Cliente não foi reiniciado após atualizar artifacts")
+        print("  - Cliente ainda está na build antiga (17000)")
+        print("  - Cliente não foi atualizado após atualizar artifacts do servidor")
         print("  - OneSync não está corretamente ativado")
-        print("  - Build do cliente não corresponde à do servidor")
         print("^3[SOLUÇÃO]:")
-        print("  1. Reinicia completamente o servidor")
-        print("  2. Reconecta ao servidor (sai e entra novamente)")
-        print("  3. Verifica se OneSync está ativado^7")
+        print("  1. FECHA COMPLETAMENTE o FiveM (não apenas desconecta)")
+        print("  2. Abre o FiveM novamente")
+        print("  3. Reconecta ao servidor")
+        print("  4. O cliente deve atualizar automaticamente para a build do servidor^7")
     end
 end)
 

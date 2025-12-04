@@ -28,6 +28,11 @@ Config.SmallIncrement = 0.2    -- Decremento ao usar /small
 Config.SaveToDatabase = true   -- Se true, guarda a escala no banco de dados
 Config.DatabaseTable = 'player_ped_scales' -- Nome da tabela (criar manualmente)
 
+-- Método de Escala
+Config.UseSetPedScale = true   -- Se true, tenta usar SetPedScale (requer build 2189+)
+Config.UseMatrixFallback = true -- Se true, usa SetEntityMatrix como fallback quando SetPedScale não está disponível
+Config.MatrixWarning = true    -- Se true, mostra avisos sobre limitações do método Matrix
+
 -- Mensagens
 Config.Messages = {
     usage = 'Uso: /%s <centímetros>',

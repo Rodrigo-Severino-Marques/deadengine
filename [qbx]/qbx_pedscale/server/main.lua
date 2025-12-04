@@ -6,7 +6,7 @@ local function hasPermission(source)
         return true
     end
 
-    local Player = QBCore.Functions.GetPlayer(source)
+    local Player = exports.qbx_core:GetPlayer(source)
     if not Player then return false end
 
     return exports.qbx_core:HasPermission(source, Config.AdminPermission)
@@ -36,7 +36,7 @@ end
 -- Evento: Cliente define sua própria escala
 RegisterNetEvent('qbx_pedscale:server:setScale', function(scale)
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
+    local Player = exports.qbx_core:GetPlayer(src)
     if not Player then return end
 
     -- Limitar escala
@@ -52,7 +52,7 @@ end)
 -- Evento: Cliente pede para carregar escala
 RegisterNetEvent('qbx_pedscale:server:loadScale', function()
     local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
+    local Player = exports.qbx_core:GetPlayer(src)
     if not Player then return end
 
     local scale = loadScale(Player.PlayerData.citizenid)
@@ -81,7 +81,7 @@ RegisterCommand(Config.Commands.setscaleplayer, function(source, args)
         return
     end
 
-    local TargetPlayer = QBCore.Functions.GetPlayer(targetId)
+    local TargetPlayer = exports.qbx_core:GetPlayer(targetId)
     if not TargetPlayer then
         exports.qbx_core:Notify(source, Config.Messages.player_not_found, 'error')
         return
@@ -122,7 +122,7 @@ RegisterCommand('resetscaleplayer', function(source, args)
         return
     end
 
-    local TargetPlayer = QBCore.Functions.GetPlayer(targetId)
+    local TargetPlayer = exports.qbx_core:GetPlayer(targetId)
     if not TargetPlayer then
         exports.qbx_core:Notify(source, Config.Messages.player_not_found, 'error')
         return
@@ -143,7 +143,7 @@ end, false)
 
 -- Export para outros recursos
 exports('setPlayerScale', function(source, scale)
-    local Player = QBCore.Functions.GetPlayer(source)
+    local Player = exports.qbx_core:GetPlayer(source)
     if not Player then return false end
 
     if scale < Config.MinScale then scale = Config.MinScale end
@@ -158,7 +158,7 @@ exports('setPlayerScale', function(source, scale)
 end)
 
 exports('getPlayerScale', function(source)
-    local Player = QBCore.Functions.GetPlayer(source)
+    local Player = exports.qbx_core:GetPlayer(source)
     if not Player then return Config.DefaultScale end
 
     return loadScale(Player.PlayerData.citizenid)
