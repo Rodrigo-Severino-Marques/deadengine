@@ -85,9 +85,16 @@ end
 
 -- Função para aplicar escala usando SetEntityMatrix (fallback)
 -- AVISO: Este método tem limitações mas é a única opção se SetPedScale não estiver disponível
+-- IMPORTANTE: Aplicar apenas ao ped do jogador e quando necessário
 local lastMatrixScale = {}
 local lastMatrixPed = 0
+local lastMatrixTime = 0
 local function applyScaleMatrix(ped, scale)
+    -- GARANTIR que é apenas o ped do jogador
+    if not DoesEntityExist(ped) or not IsPedAPlayer(ped) then
+        return false
+    end
+    
     if not GetEntityMatrix or not SetEntityMatrix then
         return false
     end
@@ -96,10 +103,20 @@ local function applyScaleMatrix(ped, scale)
     if ped ~= lastMatrixPed then
         lastMatrixScale = {}
         lastMatrixPed = ped
+        lastMatrixTime = 0
     end
     
-    -- Aplicar sempre (não verificar cache) para garantir persistência
-    -- Outros scripts podem sobrescrever, então precisamos reaplicar continuamente
+    -- Verificar se já foi aplicada recentemente (evitar duplicação e spam)
+    local currentTime = GetGameTimer()
+    local pedHandle = ped
+    -- Só verificar cache se a escala não mudou E foi aplicada há menos de 1000ms
+    -- Isto permite reaplicar ocasionalmente para manter persistência, mas evita spam excessivo
+    if lastMatrixScale[pedHandle] and math.abs(lastMatrixScale[pedHandle] - scale) < 0.001 then
+        -- Só pular se foi aplicada há menos de 1 segundo (reaplicar a cada 1 segundo para manter)
+        if currentTime - lastMatrixTime < 1000 then
+            return true -- Já está aplicada e muito recente
+        end
+    end
     
     local success, right, forward, up, pos = pcall(function()
         return GetEntityMatrix(ped)
@@ -143,6 +160,7 @@ local function applyScaleMatrix(ped, scale)
             lastMatrixScale = {}
         end
         lastMatrixScale[ped] = scale
+        lastMatrixTime = currentTime
     end
     
     return setSuccess
@@ -160,6 +178,13 @@ local function applyScale(scale)
     end
 
     local ped = PlayerPedId()
+    
+    -- GARANTIR que é apenas o ped do jogador
+    if not DoesEntityExist(ped) or not IsPedAPlayer(ped) then
+        Notify("Erro: Ped inválido", 'error')
+        return scale
+    end
+    
     local success = false
     
     -- Tentar usar SetPedScale primeiro (método oficial)
@@ -170,7 +195,9 @@ local function applyScale(scale)
         
         if success_pcall then
             success = true
-            -- NÃO resetar cache - deixar a thread contínua aplicar
+            -- Resetar cache para forçar reaplicação na thread contínua
+            lastAppliedPed = 0
+            lastAppliedScale = Config.DefaultScale
         else
             print(string.format("^3[WARNING] SetPedScale falhou: %s. Tentando fallback...^7", tostring(err)))
         end
@@ -178,12 +205,18 @@ local function applyScale(scale)
     
     -- Se SetPedScale não funcionou, tentar SetEntityMatrix como fallback
     if not success and useMatrixFallback then
+        -- Resetar cache do Matrix para forçar aplicação
+        lastMatrixPed = 0
+        lastMatrixTime = 0
         success = applyScaleMatrix(ped, scale)
         if success then
             if Config.MatrixWarning then
                 print(string.format("^3[INFO] Escala aplicada usando SetEntityMatrix: %.2f^7", scale))
                 print("^3[WARNING] SetEntityMatrix tem limitações: hitbox não muda, colisões podem falhar^7")
             end
+            -- Resetar cache para forçar reaplicação na thread contínua
+            lastAppliedPed = 0
+            lastAppliedScale = Config.DefaultScale
         else
             print("^1[ERROR] SetEntityMatrix também falhou^7")
         end
@@ -202,8 +235,10 @@ local function applyScale(scale)
     
     currentScale = scale
 
-    -- Sincronizar com servidor
+    -- Sincronizar com servidor (guarda permanentemente no banco de dados)
     TriggerServerEvent('qbx_pedscale:server:setScale', scale)
+    
+    print(string.format("^2[INFO] Escala permanente definida: %.2f (guardada no banco de dados)^7", scale))
 
     return scale
 end
@@ -398,10 +433,12 @@ AddEventHandler('QBCore:Client:OnPlayerLoaded', function()
     TriggerServerEvent('qbx_pedscale:server:loadScale')
 end)
 
--- Aplicar escala quando recebida do servidor
+-- Aplicar escala quando recebida do servidor (carregada do banco de dados)
 RegisterNetEvent('qbx_pedscale:client:applyScale', function(scale)
     if scale and scale > 0 then
+        currentScale = scale
         applyScale(scale)
+        print(string.format("^2[INFO] Escala permanente carregada: %.2f^7", scale))
     end
 end)
 
@@ -418,9 +455,12 @@ AddEventHandler('gameEventTriggered', function(name, args)
     end
 end)
 
--- Evento quando o jogador spawna
+-- Evento quando o jogador spawna (garantir que escala permanente é aplicada)
 AddEventHandler('playerSpawned', function()
     Wait(2000) -- Aguardar ped carregar completamente
+    -- Carregar escala do banco de dados
+    TriggerServerEvent('qbx_pedscale:server:loadScale')
+    -- Aplicar escala atual (se já foi carregada)
     if currentScale ~= Config.DefaultScale then
         lastAppliedPed = 0
         lastAppliedScale = Config.DefaultScale
@@ -453,31 +493,37 @@ CreateThread(function()
     while true do
         Wait(Config.UpdateInterval)
         local ped = PlayerPedId()
-        if DoesEntityExist(ped) and ped ~= 0 then
+        
+        -- GARANTIR que é apenas o ped do jogador (não NPCs ou outros peds)
+        if DoesEntityExist(ped) and ped ~= 0 and IsPedAPlayer(ped) then
             local currentPedModel = GetEntityModel(ped)
             local scaleToApply = isMenuOpen and previewScale or currentScale
             
             -- Verificar se o ped mudou (respawn, mudança de modelo, etc)
             local pedChanged = (ped ~= lastAppliedPed) or (currentPedModel ~= pedModel)
             
-            -- APLICAR SEMPRE se a escala não é padrão (não apenas quando muda)
-            -- Isto garante que mesmo que outro script tente resetar, vamos reaplicar
+            -- APLICAR quando necessário (evitar spam mas garantir persistência)
             if scaleToApply ~= Config.DefaultScale then
-                -- Aplicar sempre, não apenas quando muda
-                -- Tentar SetPedScale primeiro
-                if useSetPedScale and SetPedScale and type(SetPedScale) == "function" then
-                    pcall(function()
-                        SetPedScale(ped, scaleToApply)
-                    end)
-                    lastAppliedScale = scaleToApply
-                    lastAppliedPed = ped
-                    pedModel = currentPedModel
-                -- Fallback para SetEntityMatrix se SetPedScale não estiver disponível
-                elseif useMatrixFallback then
-                    applyScaleMatrix(ped, scaleToApply)
-                    lastAppliedScale = scaleToApply
-                    lastAppliedPed = ped
-                    pedModel = currentPedModel
+                -- Aplicar apenas se mudou ou se ped mudou (evitar spam excessivo)
+                if scaleToApply ~= lastAppliedScale or pedChanged then
+                    -- Tentar SetPedScale primeiro (pode aplicar sempre)
+                    if useSetPedScale and SetPedScale and type(SetPedScale) == "function" then
+                        -- SetPedScale pode ser aplicado sempre sem problemas
+                        pcall(function()
+                            SetPedScale(ped, scaleToApply)
+                        end)
+                        -- Atualizar cache
+                        lastAppliedScale = scaleToApply
+                        lastAppliedPed = ped
+                        pedModel = currentPedModel
+                    -- Fallback para SetEntityMatrix
+                    elseif useMatrixFallback then
+                        -- Aplicar SetEntityMatrix (a função tem proteção contra spam)
+                        applyScaleMatrix(ped, scaleToApply)
+                        lastAppliedScale = scaleToApply
+                        lastAppliedPed = ped
+                        pedModel = currentPedModel
+                    end
                 end
             elseif scaleToApply == Config.DefaultScale and lastAppliedScale ~= Config.DefaultScale then
                 -- Resetar para padrão apenas quando necessário

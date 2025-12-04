@@ -36,7 +36,7 @@ Config.MatrixWarning = true    -- Se true, mostra avisos sobre limitações do m
 -- Menu de Escala
 Config.EnableMenu = true       -- Se true, ativa o menu avançado
 Config.MenuKey = 'F6'          -- Tecla para abrir o menu (ou false para desativar)
-Config.UpdateInterval = 50     -- Intervalo de atualização em ms (quanto menor, mais suave) - usado para manter escala aplicada
+Config.UpdateInterval = 100    -- Intervalo de atualização em ms (quanto menor, mais suave) - usado para manter escala aplicada
 
 -- Mensagens
 Config.Messages = {
