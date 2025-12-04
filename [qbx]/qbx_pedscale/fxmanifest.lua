@@ -5,7 +5,13 @@ author 'DeadEngine'
 description 'Sistema de Escala de Peds - Permite alterar o tamanho de players e peds'
 version '1.0.0'
 
+dependencies {
+    'ox_lib',
+    'qbx_core'
+}
+
 shared_scripts {
+    '@ox_lib/init.lua',
     'config.lua'
 }
 

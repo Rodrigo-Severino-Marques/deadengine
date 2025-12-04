@@ -9,7 +9,7 @@ local function hasPermission(source)
     local Player = QBCore.Functions.GetPlayer(source)
     if not Player then return false end
 
-    return QBCore.Functions.HasPermission(source, Config.AdminPermission)
+    return exports.qbx_core:HasPermission(source, Config.AdminPermission)
 end
 
 -- Guardar escala no banco de dados
@@ -64,12 +64,12 @@ end)
 -- Comando Admin: /setscaleplayer <id> <centímetros>
 RegisterCommand(Config.Commands.setscaleplayer, function(source, args)
     if not hasPermission(source) then
-        QBCore.Functions.Notify(source, Config.Messages.no_permission, 'error')
+        exports.qbx_core:Notify(source, Config.Messages.no_permission, 'error')
         return
     end
 
     if not args[1] or not args[2] then
-        QBCore.Functions.Notify(source, Config.Messages.usage_admin:format(Config.Commands.setscaleplayer), 'inform')
+        exports.qbx_core:Notify(source, Config.Messages.usage_admin:format(Config.Commands.setscaleplayer), 'inform')
         return
     end
 
@@ -77,13 +77,13 @@ RegisterCommand(Config.Commands.setscaleplayer, function(source, args)
     local cm = tonumber(args[2])
 
     if not targetId or not cm then
-        QBCore.Functions.Notify(source, Config.Messages.invalid_number, 'error')
+        exports.qbx_core:Notify(source, Config.Messages.invalid_number, 'error')
         return
     end
 
     local TargetPlayer = QBCore.Functions.GetPlayer(targetId)
     if not TargetPlayer then
-        QBCore.Functions.Notify(source, Config.Messages.player_not_found, 'error')
+        exports.qbx_core:Notify(source, Config.Messages.player_not_found, 'error')
         return
     end
 
@@ -100,31 +100,31 @@ RegisterCommand(Config.Commands.setscaleplayer, function(source, args)
     TriggerClientEvent('qbx_pedscale:client:applyScale', targetId, scale)
 
     -- Notificar ambos
-    QBCore.Functions.Notify(source, Config.Messages.scale_set_other:format(targetId, cm, scale), 'success')
-    QBCore.Functions.Notify(targetId, Config.Messages.scale_set:format(cm, scale), 'success')
+    exports.qbx_core:Notify(source, Config.Messages.scale_set_other:format(targetId, cm, scale), 'success')
+    exports.qbx_core:Notify(targetId, Config.Messages.scale_set:format(cm, scale), 'success')
 end, false)
 
 -- Comando Admin: /resetscaleplayer <id>
 RegisterCommand('resetscaleplayer', function(source, args)
     if not hasPermission(source) then
-        QBCore.Functions.Notify(source, Config.Messages.no_permission, 'error')
+        exports.qbx_core:Notify(source, Config.Messages.no_permission, 'error')
         return
     end
 
     if not args[1] then
-        QBCore.Functions.Notify(source, 'Uso: /resetscaleplayer <id>', 'inform')
+        exports.qbx_core:Notify(source, 'Uso: /resetscaleplayer <id>', 'inform')
         return
     end
 
     local targetId = tonumber(args[1])
     if not targetId then
-        QBCore.Functions.Notify(source, Config.Messages.invalid_number, 'error')
+        exports.qbx_core:Notify(source, Config.Messages.invalid_number, 'error')
         return
     end
 
     local TargetPlayer = QBCore.Functions.GetPlayer(targetId)
     if not TargetPlayer then
-        QBCore.Functions.Notify(source, Config.Messages.player_not_found, 'error')
+        exports.qbx_core:Notify(source, Config.Messages.player_not_found, 'error')
         return
     end
 
@@ -137,8 +137,8 @@ RegisterCommand('resetscaleplayer', function(source, args)
     TriggerClientEvent('qbx_pedscale:client:applyScale', targetId, Config.DefaultScale)
 
     -- Notificar ambos
-    QBCore.Functions.Notify(source, Config.Messages.scale_reset_other:format(targetId), 'success')
-    QBCore.Functions.Notify(targetId, Config.Messages.scale_reset, 'success')
+    exports.qbx_core:Notify(source, Config.Messages.scale_reset_other:format(targetId), 'success')
+    exports.qbx_core:Notify(targetId, Config.Messages.scale_reset, 'success')
 end, false)
 
 -- Export para outros recursos

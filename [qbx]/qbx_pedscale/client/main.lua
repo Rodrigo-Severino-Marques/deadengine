@@ -2,6 +2,32 @@ local QBCore = exports['qbx_core']
 local PlayerData = {}
 local currentScale = Config.DefaultScale
 
+-- Verificar se ox_lib está disponível
+local hasOxLib = GetResourceState('ox_lib') == 'started'
+
+-- Função helper para notificações (compatível com QBX)
+local function Notify(message, type)
+    if hasOxLib and lib and lib.notify then
+        lib.notify({
+            title = 'Escala',
+            description = message,
+            type = type or 'inform'
+        })
+    else
+        exports.qbx_core:Notify(message, type or 'inform')
+    end
+end
+
+-- Função helper para input dialog
+local function InputDialog(title, options)
+    if hasOxLib and lib and lib.inputDialog then
+        return lib.inputDialog(title, options)
+    else
+        -- Fallback simples sem dialog
+        return nil
+    end
+end
+
 -- Função para converter centímetros para escala
 local function cmToScale(cm)
     return cm / Config.DefaultHeight
@@ -17,22 +43,27 @@ local function applyScale(scale)
     -- Limitar escala
     if scale < Config.MinScale then
         scale = Config.MinScale
-        lib.notify({
-            title = 'Escala',
-            description = Config.Messages.too_small:format(Config.MinScale),
-            type = 'error'
-        })
+        Notify(Config.Messages.too_small:format(Config.MinScale), 'error')
     elseif scale > Config.MaxScale then
         scale = Config.MaxScale
-        lib.notify({
-            title = 'Escala',
-            description = Config.Messages.too_large:format(Config.MaxScale),
-            type = 'error'
-        })
+        Notify(Config.Messages.too_large:format(Config.MaxScale), 'error')
     end
 
     local ped = PlayerPedId()
-    SetPedScale(ped, scale)
+    
+    -- Verificar se a native SetPedScale existe (requer build 2189+)
+    -- Usar pcall para verificar se a função existe
+    local success, result = pcall(function()
+        return SetPedScale(ped, scale)
+    end)
+    
+    if not success then
+        -- SetPedScale não está disponível
+        print(string.format("^3[WARNING] SetPedScale não está disponível. Requer FiveM build 2189+ (OneSync Infinity)^7"))
+        Notify("SetPedScale não está disponível. Requer FiveM build 2189+ com OneSync Infinity", 'error')
+        return scale
+    end
+    
     currentScale = scale
 
     -- Sincronizar com servidor
@@ -44,62 +75,38 @@ end
 -- Comando: /scale <centímetros>
 RegisterCommand(Config.Commands.scale, function(source, args)
     if not args[1] then
-        lib.notify({
-            title = 'Escala',
-            description = Config.Messages.usage:format(Config.Commands.scale),
-            type = 'inform'
-        })
+        Notify(Config.Messages.usage:format(Config.Commands.scale), 'inform')
         return
     end
 
     local cm = tonumber(args[1])
     if not cm then
-        lib.notify({
-            title = 'Escala',
-            description = Config.Messages.invalid_number,
-            type = 'error'
-        })
+        Notify(Config.Messages.invalid_number, 'error')
         return
     end
 
     local scale = cmToScale(cm)
     scale = applyScale(scale)
 
-    lib.notify({
-        title = 'Escala',
-        description = Config.Messages.scale_set:format(cm, scale),
-        type = 'success'
-    })
+    Notify(Config.Messages.scale_set:format(cm, scale), 'success')
 end, false)
 
 -- Comando: /setscale <escala>
 RegisterCommand(Config.Commands.setscale, function(source, args)
     if not args[1] then
-        lib.notify({
-            title = 'Escala',
-            description = Config.Messages.usage_scale:format(Config.Commands.setscale),
-            type = 'inform'
-        })
+        Notify(Config.Messages.usage_scale:format(Config.Commands.setscale), 'inform')
         return
     end
 
     local scale = tonumber(args[1])
     if not scale then
-        lib.notify({
-            title = 'Escala',
-            description = Config.Messages.invalid_number,
-            type = 'error'
-        })
+        Notify(Config.Messages.invalid_number, 'error')
         return
     end
 
     scale = applyScale(scale)
 
-    lib.notify({
-        title = 'Escala',
-        description = Config.Messages.scale_set:format(scaleToCm(scale), scale),
-        type = 'success'
-    })
+    Notify(Config.Messages.scale_set:format(scaleToCm(scale), scale), 'success')
 end, false)
 
 -- Comando: /big - Aumenta tamanho
@@ -107,11 +114,7 @@ RegisterCommand(Config.Commands.big, function()
     local newScale = currentScale + Config.BigIncrement
     newScale = applyScale(newScale)
 
-    lib.notify({
-        title = 'Escala',
-        description = Config.Messages.big_used:format(newScale),
-        type = 'success'
-    })
+    Notify(Config.Messages.big_used:format(newScale), 'success')
 end, false)
 
 -- Comando: /small - Diminui tamanho
@@ -119,26 +122,18 @@ RegisterCommand(Config.Commands.small, function()
     local newScale = currentScale - Config.SmallIncrement
     newScale = applyScale(newScale)
 
-    lib.notify({
-        title = 'Escala',
-        description = Config.Messages.small_used:format(newScale),
-        type = 'success'
-    })
+    Notify(Config.Messages.small_used:format(newScale), 'success')
 end, false)
 
 -- Comando: /resetscale - Reseta para tamanho normal
 RegisterCommand(Config.Commands.reset, function()
     applyScale(Config.DefaultScale)
-    lib.notify({
-        title = 'Escala',
-        description = Config.Messages.scale_reset,
-        type = 'success'
-    })
+    Notify(Config.Messages.scale_reset, 'success')
 end, false)
 
 -- Input Dialog para definir altura
 RegisterCommand('setheight', function()
-    local input = lib.inputDialog('Definir Altura', {
+    local input = InputDialog('Definir Altura', {
         {
             type = 'number',
             label = 'Altura em Centímetros',
@@ -150,22 +145,23 @@ RegisterCommand('setheight', function()
         }
     })
 
-    if not input then return end
+    if not input then 
+        Notify('Input dialog não disponível. Usa /scale <cm> em vez disso.', 'error')
+        return 
+    end
 
     local cm = input[1]
+    if not cm then return end
+    
     local scale = cmToScale(cm)
     scale = applyScale(scale)
 
-    lib.notify({
-        title = 'Escala',
-        description = Config.Messages.scale_set:format(cm, scale),
-        type = 'success'
-    })
+    Notify(Config.Messages.scale_set:format(cm, scale), 'success')
 end, false)
 
 -- Input Dialog para definir escala diretamente
 RegisterCommand('setscaleinput', function()
-    local input = lib.inputDialog('Definir Escala', {
+    local input = InputDialog('Definir Escala', {
         {
             type = 'number',
             label = 'Escala',
@@ -178,16 +174,17 @@ RegisterCommand('setscaleinput', function()
         }
     })
 
-    if not input then return end
+    if not input then 
+        Notify('Input dialog não disponível. Usa /setscale <escala> em vez disso.', 'error')
+        return 
+    end
 
     local scale = input[1]
+    if not scale then return end
+    
     scale = applyScale(scale)
 
-    lib.notify({
-        title = 'Escala',
-        description = Config.Messages.scale_set:format(scaleToCm(scale), scale),
-        type = 'success'
-    })
+    Notify(Config.Messages.scale_set:format(scaleToCm(scale), scale), 'success')
 end, false)
 
 -- Evento do servidor para aplicar escala (admin) - removido, não é necessário
@@ -223,7 +220,9 @@ CreateThread(function()
         if currentScale ~= Config.DefaultScale then
             local ped = PlayerPedId()
             if DoesEntityExist(ped) then
-                SetPedScale(ped, currentScale)
+                pcall(function()
+                    SetPedScale(ped, currentScale)
+                end)
             end
         end
     end
