@@ -63,6 +63,38 @@ local function scaleToCm(scale)
     return math.floor(scale * Config.DefaultHeight)
 end
 
+-- Função para aplicar escala usando SetEntityMatrix (fallback)
+local function applyScaleMatrix(ped, scale)
+    if not GetEntityMatrix or not SetEntityMatrix then
+        return false
+    end
+    
+    local success, right, forward, up, pos = pcall(function()
+        return GetEntityMatrix(ped)
+    end)
+    
+    if not success or not right then
+        return false
+    end
+    
+    -- GetEntityMatrix retorna: right, forward, up, position (4 vetores)
+    -- Multiplicar cada componente dos vetores pela escala
+    local newRight = vector3(right.x * scale, right.y * scale, right.z * scale)
+    local newForward = vector3(forward.x * scale, forward.y * scale, forward.z * scale)
+    local newUp = vector3(up.x * scale, up.y * scale, up.z * scale)
+    
+    -- SetEntityMatrix: forwardX, forwardY, forwardZ, rightX, rightY, rightZ, upX, upY, upZ, atX, atY, atZ
+    local setSuccess = pcall(function()
+        SetEntityMatrix(ped, 
+            newForward.x, newForward.y, newForward.z,  -- forward
+            newRight.x, newRight.y, newRight.z,        -- right
+            newUp.x, newUp.y, newUp.z,                 -- up
+            pos.x, pos.y, pos.z)                       -- position
+    end)
+    
+    return setSuccess
+end
+
 -- Função para aplicar escala com limites
 local function applyScale(scale)
     -- Limitar escala
@@ -75,47 +107,41 @@ local function applyScale(scale)
     end
 
     local ped = PlayerPedId()
+    local success = false
     
-    -- Verificar se a native SetPedScale existe e é uma função
-    if SetPedScale == nil then
-        print("^1[ERROR] SetPedScale é nil (não existe)^7")
-        print("^3[INFO] Build do servidor: 22934 (compatível)^7")
-        print("^3[SOLUÇÃO]: FECHA o FiveM completamente e abre novamente^7")
-        Notify("SetPedScale não disponível. Fecha e abre o FiveM novamente.", 'error')
-        return scale
+    -- Tentar usar SetPedScale primeiro (método oficial)
+    if useSetPedScale and SetPedScale and type(SetPedScale) == "function" then
+        local success_pcall, err = pcall(function()
+            SetPedScale(ped, scale)
+        end)
+        
+        if success_pcall then
+            success = true
+            -- Verificar se foi aplicada
+            Wait(100)
+            if GetPedScale and type(GetPedScale) == "function" then
+                local currentPedScale = GetPedScale(ped)
+                if currentPedScale and math.abs(currentPedScale - scale) > 0.01 then
+                    print(string.format("^3[WARNING] Escala não aplicada corretamente. Esperado: %.2f, Atual: %.2f^7", scale, currentPedScale))
+                end
+            end
+        else
+            print(string.format("^3[WARNING] SetPedScale falhou: %s. Tentando fallback...^7", tostring(err)))
+        end
     end
     
-    if type(SetPedScale) ~= "function" then
-        print(string.format("^1[ERROR] SetPedScale não é função (tipo: %s)^7", type(SetPedScale)))
-        print("^3[SOLUÇÃO]: FECHA o FiveM completamente e abre novamente^7")
-        Notify("SetPedScale não disponível. Fecha e abre o FiveM novamente.", 'error')
-        return scale
+    -- Se SetPedScale não funcionou, usar Matrix fallback
+    if not success and useMatrixFallback then
+        success = applyScaleMatrix(ped, scale)
+        if success then
+            print(string.format("^3[INFO] Escala aplicada usando SetEntityMatrix: %.2f^7", scale))
+        end
     end
-    
-    -- Tentar aplicar a escala
-    local success, err = pcall(function()
-        SetPedScale(ped, scale)
-    end)
     
     if not success then
-        -- SetPedScale falhou
-        print(string.format("^1[ERROR] SetPedScale falhou: %s^7", tostring(err)))
-        print("^3[INFO] Build: 22934 - Deve funcionar, mas:")
-        print("  - Reconecta ao servidor (sai e entra)")
-        print("  - Verifica se OneSync está ativado^7")
-        Notify("Erro ao aplicar escala. Tenta reconectar ao servidor.", 'error')
+        print("^1[ERROR] Não foi possível aplicar escala. Nenhum método disponível.^7")
+        Notify("Erro ao aplicar escala. Verifica console.", 'error')
         return scale
-    end
-    
-    -- Verificar se a escala foi aplicada (se GetPedScale existir)
-    Wait(100)
-    if GetPedScale and type(GetPedScale) == "function" then
-        local currentPedScale = GetPedScale(ped)
-        if currentPedScale and math.abs(currentPedScale - scale) > 0.01 then
-            print(string.format("^3[WARNING] Escala não foi aplicada corretamente. Esperado: %.2f, Atual: %.2f^7", scale, currentPedScale))
-        else
-            print(string.format("^2[SUCCESS] Escala aplicada: %.2f^7", scale))
-        end
     end
     
     currentScale = scale
@@ -340,9 +366,13 @@ CreateThread(function()
         if currentScale ~= Config.DefaultScale then
             local ped = PlayerPedId()
             if DoesEntityExist(ped) then
-                pcall(function()
-                    SetPedScale(ped, currentScale)
-                end)
+                if useSetPedScale and SetPedScale and type(SetPedScale) == "function" then
+                    pcall(function()
+                        SetPedScale(ped, currentScale)
+                    end)
+                elseif useMatrixFallback then
+                    applyScaleMatrix(ped, currentScale)
+                end
             end
         end
     end

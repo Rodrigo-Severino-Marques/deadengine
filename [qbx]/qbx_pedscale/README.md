@@ -102,16 +102,26 @@ local scale = exports['qbx_pedscale']:getPlayerScale(source)
 
 ## ⚠️ Notas Importantes
 
-1. **SetPedScale** requer:
-   - FiveM build **2189 ou superior** (obrigatório)
-   - **OneSync ativado** (obrigatório)
-   - OneSync Infinity é **opcional** (só necessário para mais de 64 jogadores)
+1. **Métodos de Escala:**
+   
+   **Método 1: SetPedScale (Oficial - Recomendado)**
+   - Requer FiveM build **2189 ou superior**
+   - Requer **OneSync ativado**
+   - Funciona perfeitamente (hitbox, colisões, etc.)
+   
+   **Método 2: SetEntityMatrix (Fallback - Alternativo)**
+   - Funciona em qualquer build do FiveM
+   - ⚠️ **Limitações:**
+     - Hitbox não muda (podes passar por portas pequenas)
+     - Colisões podem falhar
+     - Armas podem ficar desproporcionadas
+     - Podes ter problemas com veículos
+   - Ativado automaticamente se `SetPedScale` não estiver disponível
    
    **🚨 Se vês erro "SetPedScale não está disponível":**
-   - Verifica a build: `version` no console
-   - Se for inferior a 2189, **atualiza os artifacts** (ver `UPDATE_BUILD.md`)
-   - Build atual: v1.0.0.17000 ❌ (muito antiga, precisa atualizar)
-   - Build necessária: v1.0.0.2189+ ✅
+   - O script usa automaticamente `SetEntityMatrix` como fallback
+   - Verás um aviso sobre as limitações
+   - Para usar o método oficial, atualiza os artifacts (ver `UPDATE_BUILD.md`)
 
 2. Escalas muito extremas podem causar problemas de colisão
 3. As armas podem ficar desproporcionadas (limitação do GTA)
