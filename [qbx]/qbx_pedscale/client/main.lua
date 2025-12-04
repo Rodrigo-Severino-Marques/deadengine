@@ -51,10 +51,12 @@ local function applyScale(scale)
 
     local ped = PlayerPedId()
     
-    -- Verificar se a native SetPedScale existe
-    if not SetPedScale then
-        print("^1[ERROR] SetPedScale não existe nesta versão do FiveM^7")
-        Notify("SetPedScale não está disponível. Requer FiveM build 2189+ com OneSync", 'error')
+    -- Verificar se a native SetPedScale existe e é uma função
+    if type(SetPedScale) ~= "function" then
+        print("^1[ERROR] SetPedScale não existe ou não é uma função^7")
+        print("^3[INFO] Build atual: 22934 (deve funcionar)^7")
+        print("^3[SOLUÇÃO]: Reconecta ao servidor (sai e entra novamente)^7")
+        Notify("SetPedScale não disponível. Reconecta ao servidor.", 'error')
         return scale
     end
     
@@ -66,17 +68,16 @@ local function applyScale(scale)
     if not success then
         -- SetPedScale falhou
         print(string.format("^1[ERROR] SetPedScale falhou: %s^7", tostring(err)))
-        print("^3[INFO] Verifica se:")
-        print("  - Build do FiveM é 2189 ou superior (digita 'version' no console)")
-        print("  - OneSync está ativado")
-        print("  - OneSync Infinity está ativado (recomendado)^7")
-        Notify("Erro ao aplicar escala. Verifica console do servidor.", 'error')
+        print("^3[INFO] Build: 22934 - Deve funcionar, mas:")
+        print("  - Reconecta ao servidor (sai e entra)")
+        print("  - Verifica se OneSync está ativado^7")
+        Notify("Erro ao aplicar escala. Tenta reconectar ao servidor.", 'error')
         return scale
     end
     
     -- Verificar se a escala foi aplicada (se GetPedScale existir)
     Wait(100)
-    if GetPedScale then
+    if GetPedScale and type(GetPedScale) == "function" then
         local currentPedScale = GetPedScale(ped)
         if currentPedScale and math.abs(currentPedScale - scale) > 0.01 then
             print(string.format("^3[WARNING] Escala não foi aplicada corretamente. Esperado: %.2f, Atual: %.2f^7", scale, currentPedScale))
@@ -212,61 +213,48 @@ end, false)
 
 -- Verificar disponibilidade do SetPedScale ao iniciar
 CreateThread(function()
-    Wait(2000) -- Aguardar recursos carregarem
-    
-    if SetPedScale then
-        print("^2[SUCCESS] SetPedScale está disponível^7")
-        local ped = PlayerPedId()
-        local testScale = GetPedScale(ped)
-        print(string.format("^2[INFO] Escala atual do ped: %.2f^7", testScale or 0))
-    else
-        print("^1[ERROR] SetPedScale NÃO está disponível^7")
-        print("^3[INFO] Verifica:")
-        print("  - Build do FiveM: deve ser 2189+")
-        print("  - OneSync: deve estar ativado")
-        print("  - Digita 'version' no console do servidor para verificar^7")
-    end
-end)
-
--- Verificar disponibilidade do SetPedScale ao iniciar
-CreateThread(function()
-    Wait(3000) -- Aguardar recursos carregarem
+    Wait(5000) -- Aguardar recursos e cliente carregarem completamente
     
     print("^5[DEBUG] Verificando disponibilidade do SetPedScale...^7")
     
-    if SetPedScale then
+    -- Verificar versão do FiveM primeiro
+    local version = GetConvar('version', '')
+    local buildNumber = version:match('v%d+%.%d+%.%d+%.(%d+)')
+    if buildNumber then
+        local build = tonumber(buildNumber)
+        if build then
+            if build >= 2189 then
+                print(string.format("^2[INFO] Build do FiveM: %d (compatível)^7", build))
+            else
+                print(string.format("^3[WARNING] Build do FiveM: %d (requer 2189+)^7", build))
+            end
+        end
+    end
+    
+    -- Verificar se SetPedScale existe
+    if type(SetPedScale) == "function" then
         print("^2[SUCCESS] SetPedScale está disponível^7")
         local ped = PlayerPedId()
-        if GetPedScale then
+        if GetPedScale and type(GetPedScale) == "function" then
             local testScale = GetPedScale(ped)
             print(string.format("^2[INFO] Escala atual do ped: %.2f^7", testScale or 0))
         end
-        
-        -- Verificar versão do FiveM
-        local version = GetConvar('version', '')
-        local buildNumber = version:match('v%d+%.%d+%.%d+%.(%d+)')
-        if buildNumber then
-            local build = tonumber(buildNumber)
-            if build then
-                if build >= 2189 then
-                    print(string.format("^2[INFO] Build do FiveM: %d (compatível)^7", build))
-                else
-                    print(string.format("^3[WARNING] Build do FiveM: %d (requer 2189+)^7", build))
-                end
-            end
-        end
     else
         print("^1[ERROR] SetPedScale NÃO está disponível^7")
-        print("^3[INFO] Verifica:")
-        print("  - Build do FiveM: deve ser 2189+ (digita 'version' no console do servidor)")
-        print("  - OneSync: deve estar ativado")
-        print("  - OneSync Infinity: recomendado (até 2048 jogadores)^7")
+        print("^3[INFO] Possíveis causas:")
+        print("  - Cliente não foi reiniciado após atualizar artifacts")
+        print("  - OneSync não está corretamente ativado")
+        print("  - Build do cliente não corresponde à do servidor")
+        print("^3[SOLUÇÃO]:")
+        print("  1. Reinicia completamente o servidor")
+        print("  2. Reconecta ao servidor (sai e entra novamente)")
+        print("  3. Verifica se OneSync está ativado^7")
     end
 end)
 
 -- Carregar escala ao spawnar
 AddEventHandler('QBCore:Client:OnPlayerLoaded', function()
-    PlayerData = QBCore.Functions.GetPlayerData()
+    PlayerData = exports.qbx_core:GetPlayerData()
     Wait(1000)
     TriggerServerEvent('qbx_pedscale:server:loadScale')
 end)

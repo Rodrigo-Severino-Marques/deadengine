@@ -2,6 +2,16 @@
 
 Sistema completo de escala de peds/players para servidores FiveM usando Qbox Framework.
 
+## 🚨 IMPORTANTE: Build do FiveM
+
+**Este recurso requer FiveM build 2189 ou superior!**
+
+Se vês o erro "SetPedScale não está disponível":
+- ✅ Verifica a build: `version` no console
+- ❌ Build atual: `17000` (muito antiga)
+- ✅ Build necessária: `2189+` (recomendado: `4752+`)
+- 📖 **Ver guia**: `UPDATE_TXADMIN.md` para atualizar no txAdmin
+
 ## 📋 Características
 
 - ✅ Alterar altura em centímetros ou escala diretamente
@@ -93,9 +103,16 @@ local scale = exports['qbx_pedscale']:getPlayerScale(source)
 ## ⚠️ Notas Importantes
 
 1. **SetPedScale** requer:
-   - FiveM build **2189 ou superior**
+   - FiveM build **2189 ou superior** (obrigatório)
    - **OneSync ativado** (obrigatório)
    - OneSync Infinity é **opcional** (só necessário para mais de 64 jogadores)
+   
+   **🚨 Se vês erro "SetPedScale não está disponível":**
+   - Verifica a build: `version` no console
+   - Se for inferior a 2189, **atualiza os artifacts** (ver `UPDATE_BUILD.md`)
+   - Build atual: v1.0.0.17000 ❌ (muito antiga, precisa atualizar)
+   - Build necessária: v1.0.0.2189+ ✅
+
 2. Escalas muito extremas podem causar problemas de colisão
 3. As armas podem ficar desproporcionadas (limitação do GTA)
 4. A escala é mantida após morte/respawn se guardada no banco de dados
