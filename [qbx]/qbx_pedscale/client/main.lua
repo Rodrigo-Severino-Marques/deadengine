@@ -59,8 +59,8 @@ local function applyScale(scale)
     
     if not success then
         -- SetPedScale não está disponível
-        print(string.format("^3[WARNING] SetPedScale não está disponível. Requer FiveM build 2189+ (OneSync Infinity)^7"))
-        Notify("SetPedScale não está disponível. Requer FiveM build 2189+ com OneSync Infinity", 'error')
+        print(string.format("^3[WARNING] SetPedScale não está disponível. Requer FiveM build 2189+ com OneSync ativado^7"))
+        Notify("SetPedScale não está disponível. Requer FiveM build 2189+ com OneSync", 'error')
         return scale
     end
     

@@ -92,10 +92,27 @@ local scale = exports['qbx_pedscale']:getPlayerScale(source)
 
 ## ⚠️ Notas Importantes
 
-1. **SetPedScale** requer FiveM build 2189+ (OneSync Infinity recomendado)
+1. **SetPedScale** requer:
+   - FiveM build **2189 ou superior**
+   - **OneSync ativado** (obrigatório)
+   - OneSync Infinity é **opcional** (só necessário para mais de 64 jogadores)
 2. Escalas muito extremas podem causar problemas de colisão
 3. As armas podem ficar desproporcionadas (limitação do GTA)
 4. A escala é mantida após morte/respawn se guardada no banco de dados
+
+## 🔧 Configuração do OneSync
+
+Para ativar o OneSync, adiciona ao teu `server.cfg`:
+
+```cfg
+# OneSync básico (até 64 jogadores)
+set onesync on
+
+# OneSync Infinity (até 2048 jogadores) - OPCIONAL
+set onesync_enableInfinity 1
+```
+
+**Nota**: OneSync Infinity só é necessário se tiveres mais de 64 jogadores. Para servidores menores, OneSync básico é suficiente.
 
 ## 🐛 Resolução de Problemas
 
