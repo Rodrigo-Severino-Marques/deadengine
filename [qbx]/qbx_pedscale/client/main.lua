@@ -12,21 +12,41 @@ CreateThread(function()
     Wait(2000)
     
     -- Verificar SetPedScale primeiro
-    if Config.UseSetPedScale and SetPedScale and type(SetPedScale) == "function" then
-        useSetPedScale = true
-        print("^2[INFO] Usando SetPedScale (método oficial)^7")
-    elseif Config.UseMatrixFallback then
-        useMatrixFallback = true
-        if Config.MatrixWarning then
-            print("^3[WARNING] SetPedScale não disponível. Usando SetEntityMatrix (método alternativo)^7")
-            print("^3[INFO] Limitações do método Matrix:")
-            print("  - Hitbox não muda (podes passar por portas pequenas)")
-            print("  - Colisões podem falhar")
-            print("  - Armas podem ficar desproporcionadas")
-            print("  - Podes ter problemas com veículos^7")
+    if Config.UseSetPedScale then
+        -- Testar se SetPedScale existe e funciona
+        if SetPedScale and type(SetPedScale) == "function" then
+            local testPed = PlayerPedId()
+            local testSuccess = pcall(function()
+                SetPedScale(testPed, 1.0)
+            end)
+            
+            if testSuccess then
+                useSetPedScale = true
+                print("^2[INFO] SetPedScale está disponível e funcional!^7")
+            else
+                print("^3[WARNING] SetPedScale existe mas não funciona corretamente^7")
+            end
+        else
+            print("^3[WARNING] SetPedScale não está disponível nesta versão^7")
         end
-    else
+    end
+    
+    -- Verificar fallback (desativado por padrão devido a duplicação)
+    if Config.UseMatrixFallback and not useSetPedScale then
+        if GetEntityMatrix and SetEntityMatrix then
+            useMatrixFallback = true
+            if Config.MatrixWarning then
+                print("^3[WARNING] SetPedScale não disponível. SetEntityMatrix está desativado (causa duplicação visual)^7")
+                print("^3[INFO] Por favor, atualiza o servidor para build 2189+ para usar SetPedScale^7")
+            end
+        end
+    end
+    
+    -- Mensagem final
+    if not useSetPedScale and not useMatrixFallback then
         print("^1[ERROR] Nenhum método de escala disponível^7")
+        print("^3[INFO] O script requer SetPedScale (build 2189+) ou SetEntityMatrix (desativado)^7")
+        print("^3[INFO] Atualiza o servidor para build 2189+ para usar este script^7")
     end
 end)
 
@@ -64,17 +84,22 @@ local function scaleToCm(scale)
 end
 
 -- Função para aplicar escala usando SetEntityMatrix (fallback)
--- AVISO: Este método pode causar problemas visuais e não é recomendado
+-- AVISO: Este método tem limitações mas é a única opção se SetPedScale não estiver disponível
+local lastMatrixScale = {}
+local lastMatrixPed = 0
 local function applyScaleMatrix(ped, scale)
-    -- Desativar SetEntityMatrix - causa problemas de duplicação
-    -- Usar apenas SetPedScale se disponível
-    return false
-    
-    -- CÓDIGO ANTIGO (DESATIVADO - CAUSA DUPLICAÇÃO):
-    --[[
     if not GetEntityMatrix or not SetEntityMatrix then
         return false
     end
+    
+    -- Se o ped mudou, resetar cache
+    if ped ~= lastMatrixPed then
+        lastMatrixScale = {}
+        lastMatrixPed = ped
+    end
+    
+    -- Aplicar sempre (não verificar cache) para garantir persistência
+    -- Outros scripts podem sobrescrever, então precisamos reaplicar continuamente
     
     local success, right, forward, up, pos = pcall(function()
         return GetEntityMatrix(ped)
@@ -84,11 +109,24 @@ local function applyScaleMatrix(ped, scale)
         return false
     end
     
-    -- GetEntityMatrix retorna: right, forward, up, position (4 vetores)
-    -- Multiplicar cada componente dos vetores pela escala
-    local newRight = vector3(right.x * scale, right.y * scale, right.z * scale)
-    local newForward = vector3(forward.x * scale, forward.y * scale, forward.z * scale)
-    local newUp = vector3(up.x * scale, up.y * scale, up.z * scale)
+    -- Normalizar os vetores antes de escalar (importante para evitar distorções)
+    local rightLength = math.sqrt(right.x^2 + right.y^2 + right.z^2)
+    local forwardLength = math.sqrt(forward.x^2 + forward.y^2 + forward.z^2)
+    local upLength = math.sqrt(up.x^2 + up.y^2 + up.z^2)
+    
+    if rightLength < 0.1 or forwardLength < 0.1 or upLength < 0.1 then
+        return false -- Vetores inválidos
+    end
+    
+    -- Normalizar e depois escalar
+    local normalizedRight = vector3(right.x / rightLength, right.y / rightLength, right.z / rightLength)
+    local normalizedForward = vector3(forward.x / forwardLength, forward.y / forwardLength, forward.z / forwardLength)
+    local normalizedUp = vector3(up.x / upLength, up.y / upLength, up.z / upLength)
+    
+    -- Aplicar escala apenas aos vetores direcionais, manter posição
+    local newRight = vector3(normalizedRight.x * scale, normalizedRight.y * scale, normalizedRight.z * scale)
+    local newForward = vector3(normalizedForward.x * scale, normalizedForward.y * scale, normalizedForward.z * scale)
+    local newUp = vector3(normalizedUp.x * scale, normalizedUp.y * scale, normalizedUp.z * scale)
     
     -- SetEntityMatrix: forwardX, forwardY, forwardZ, rightX, rightY, rightZ, upX, upY, upZ, atX, atY, atZ
     local setSuccess = pcall(function()
@@ -99,8 +137,15 @@ local function applyScaleMatrix(ped, scale)
             pos.x, pos.y, pos.z)                       -- position
     end)
     
+    -- Guardar escala aplicada (usar ped como chave)
+    if setSuccess then
+        if not lastMatrixScale then
+            lastMatrixScale = {}
+        end
+        lastMatrixScale[ped] = scale
+    end
+    
     return setSuccess
-    --]]
 end
 
 -- Função para aplicar escala com limites
@@ -125,30 +170,32 @@ local function applyScale(scale)
         
         if success_pcall then
             success = true
-            -- Verificar se foi aplicada
-            Wait(100)
-            if GetPedScale and type(GetPedScale) == "function" then
-                local currentPedScale = GetPedScale(ped)
-                if currentPedScale and math.abs(currentPedScale - scale) > 0.01 then
-                    print(string.format("^3[WARNING] Escala não aplicada corretamente. Esperado: %.2f, Atual: %.2f^7", scale, currentPedScale))
-                end
-            end
+            -- NÃO resetar cache - deixar a thread contínua aplicar
         else
             print(string.format("^3[WARNING] SetPedScale falhou: %s. Tentando fallback...^7", tostring(err)))
         end
     end
     
-    -- NÃO usar SetEntityMatrix - causa problemas de duplicação visual
-    -- Se SetPedScale não funcionou, avisar o utilizador
-    if not success then
-        if useMatrixFallback then
-            print("^1[ERROR] SetPedScale não está disponível e SetEntityMatrix foi desativado (causa duplicação visual)^7")
-            print("^3[INFO] Por favor, atualiza o servidor para build 2189+ para usar SetPedScale^7")
+    -- Se SetPedScale não funcionou, tentar SetEntityMatrix como fallback
+    if not success and useMatrixFallback then
+        success = applyScaleMatrix(ped, scale)
+        if success then
+            if Config.MatrixWarning then
+                print(string.format("^3[INFO] Escala aplicada usando SetEntityMatrix: %.2f^7", scale))
+                print("^3[WARNING] SetEntityMatrix tem limitações: hitbox não muda, colisões podem falhar^7")
+            end
+        else
+            print("^1[ERROR] SetEntityMatrix também falhou^7")
         end
     end
     
+    -- Se nenhum método funcionou
     if not success then
         print("^1[ERROR] Não foi possível aplicar escala. Nenhum método disponível.^7")
+        print("^3[INFO] Soluções possíveis:^7")
+        print("^3  1. Atualiza o servidor para build 2189 ou superior (recomendado)^7")
+        print("^3  2. FECHA COMPLETAMENTE o FiveM e abre novamente^7")
+        print("^3  3. Verifica se OneSync está ativado no servidor^7")
         Notify("Erro ao aplicar escala. Verifica console.", 'error')
         return scale
     end
@@ -361,49 +408,110 @@ end)
 -- Manter escala após morte/respawn
 AddEventHandler('gameEventTriggered', function(name, args)
     if name == 'CEventNetworkEntityDamage' then
-        Wait(100)
+        Wait(500)
         if currentScale ~= Config.DefaultScale then
+            -- Resetar cache para forçar reaplicação
+            lastAppliedPed = 0
+            lastAppliedScale = Config.DefaultScale
             applyScale(currentScale)
         end
     end
 end)
 
--- Aplicar escala continuamente (para garantir que não para)
--- IMPORTANTE: Aplicar apenas uma vez por ped para evitar duplicações
+-- Evento quando o jogador spawna
+AddEventHandler('playerSpawned', function()
+    Wait(2000) -- Aguardar ped carregar completamente
+    if currentScale ~= Config.DefaultScale then
+        lastAppliedPed = 0
+        lastAppliedScale = Config.DefaultScale
+        applyScale(currentScale)
+    end
+end)
+
+-- Evento quando o modelo do ped muda
+AddEventHandler('baseevents:enteredVehicle', function()
+    Wait(100)
+    if currentScale ~= Config.DefaultScale then
+        applyScale(currentScale)
+    end
+end)
+
+AddEventHandler('baseevents:leftVehicle', function()
+    Wait(100)
+    if currentScale ~= Config.DefaultScale then
+        applyScale(currentScale)
+    end
+end)
+
+-- Aplicar escala continuamente (para garantir persistência)
+-- IMPORTANTE: Aplicar SEMPRE para garantir que não é sobrescrita por outros scripts
 local lastAppliedScale = Config.DefaultScale
 local lastAppliedPed = 0
+local pedModel = 0
 
 CreateThread(function()
     while true do
         Wait(Config.UpdateInterval)
         local ped = PlayerPedId()
         if DoesEntityExist(ped) and ped ~= 0 then
+            local currentPedModel = GetEntityModel(ped)
             local scaleToApply = isMenuOpen and previewScale or currentScale
             
-            -- Só aplicar se mudou ou se é um ped diferente
-            if (scaleToApply ~= lastAppliedScale or ped ~= lastAppliedPed) and scaleToApply ~= Config.DefaultScale then
-                -- Usar APENAS SetPedScale - SetEntityMatrix causa duplicação
+            -- Verificar se o ped mudou (respawn, mudança de modelo, etc)
+            local pedChanged = (ped ~= lastAppliedPed) or (currentPedModel ~= pedModel)
+            
+            -- APLICAR SEMPRE se a escala não é padrão (não apenas quando muda)
+            -- Isto garante que mesmo que outro script tente resetar, vamos reaplicar
+            if scaleToApply ~= Config.DefaultScale then
+                -- Aplicar sempre, não apenas quando muda
+                -- Tentar SetPedScale primeiro
                 if useSetPedScale and SetPedScale and type(SetPedScale) == "function" then
-                    local success = pcall(function()
+                    pcall(function()
                         SetPedScale(ped, scaleToApply)
                     end)
-                    if success then
-                        lastAppliedScale = scaleToApply
-                        lastAppliedPed = ped
-                    end
-                -- NÃO usar SetEntityMatrix - causa problemas de duplicação visual
-                -- elseif useMatrixFallback then
-                --     applyScaleMatrix(ped, scaleToApply)
+                    lastAppliedScale = scaleToApply
+                    lastAppliedPed = ped
+                    pedModel = currentPedModel
+                -- Fallback para SetEntityMatrix se SetPedScale não estiver disponível
+                elseif useMatrixFallback then
+                    applyScaleMatrix(ped, scaleToApply)
+                    lastAppliedScale = scaleToApply
+                    lastAppliedPed = ped
+                    pedModel = currentPedModel
                 end
             elseif scaleToApply == Config.DefaultScale and lastAppliedScale ~= Config.DefaultScale then
-                -- Resetar para escala padrão
+                -- Resetar para padrão apenas quando necessário
                 if useSetPedScale and SetPedScale and type(SetPedScale) == "function" then
                     pcall(function()
                         SetPedScale(ped, Config.DefaultScale)
                     end)
-                    lastAppliedScale = Config.DefaultScale
-                    lastAppliedPed = ped
+                elseif useMatrixFallback then
+                    applyScaleMatrix(ped, Config.DefaultScale)
                 end
+                lastAppliedScale = Config.DefaultScale
+                lastAppliedPed = ped
+                pedModel = currentPedModel
+            end
+        end
+    end
+end)
+
+-- Evento quando o ped muda (respawn, mudança de modelo, etc)
+CreateThread(function()
+    local lastPed = 0
+    while true do
+        Wait(1000)
+        local ped = PlayerPedId()
+        if ped ~= lastPed and DoesEntityExist(ped) then
+            lastPed = ped
+            -- Resetar cache para forçar reaplicação
+            lastAppliedPed = 0
+            lastAppliedScale = Config.DefaultScale
+            
+            -- Reaplicar escala após mudança de ped
+            Wait(500)
+            if currentScale ~= Config.DefaultScale then
+                applyScale(currentScale)
             end
         end
     end
@@ -423,14 +531,13 @@ local function applyPreviewScale(scale, silent)
     if scale < Config.MinScale then scale = Config.MinScale end
     if scale > Config.MaxScale then scale = Config.MaxScale end
     
-    -- Aplicar escala APENAS com SetPedScale - SetEntityMatrix causa duplicação
+    -- Aplicar escala com SetPedScale ou SetEntityMatrix como fallback
     if useSetPedScale and SetPedScale and type(SetPedScale) == "function" then
         pcall(function()
             SetPedScale(ped, scale)
         end)
-    -- NÃO usar SetEntityMatrix - causa problemas de duplicação visual
-    -- elseif useMatrixFallback then
-    --     applyScaleMatrix(ped, scale)
+    elseif useMatrixFallback then
+        applyScaleMatrix(ped, scale)
     end
     
     previewScale = scale
@@ -509,18 +616,24 @@ end
 
 -- Callbacks NUI
 RegisterNUICallback('updateScale', function(data, cb)
-    if data.scale then
-        previewScale = math.max(Config.MinScale, math.min(Config.MaxScale, data.scale))
-        applyPreviewScale(previewScale)
+    if data and data.scale then
+        local scale = tonumber(data.scale)
+        if scale then
+            previewScale = math.max(Config.MinScale, math.min(Config.MaxScale, scale))
+            applyPreviewScale(previewScale)
+        end
     end
     cb('ok')
 end)
 
 RegisterNUICallback('confirmScale', function(data, cb)
-    if data.scale then
-        local finalScale = math.max(Config.MinScale, math.min(Config.MaxScale, data.scale))
-        applyScale(finalScale)
-        Notify(Config.Messages.scale_set:format(scaleToCm(finalScale), finalScale), 'success')
+    if data and data.scale then
+        local scale = tonumber(data.scale)
+        if scale then
+            local finalScale = math.max(Config.MinScale, math.min(Config.MaxScale, scale))
+            applyScale(finalScale)
+            Notify(Config.Messages.scale_set:format(scaleToCm(finalScale), finalScale), 'success')
+        end
     end
     closeScaleMenu(false)
     cb('ok')

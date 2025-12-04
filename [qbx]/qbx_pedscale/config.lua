@@ -30,7 +30,7 @@ Config.DatabaseTable = 'player_ped_scales' -- Nome da tabela (criar manualmente)
 
 -- Método de Escala
 Config.UseSetPedScale = true   -- Se true, tenta usar SetPedScale (requer build 2189+)
-Config.UseMatrixFallback = false -- DESATIVADO - SetEntityMatrix causa duplicação visual de bonecos
+Config.UseMatrixFallback = true -- Se true, usa SetEntityMatrix como fallback (melhorado para evitar duplicação)
 Config.MatrixWarning = true    -- Se true, mostra avisos sobre limitações do método Matrix
 
 -- Menu de Escala

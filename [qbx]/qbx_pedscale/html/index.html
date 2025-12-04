@@ -311,6 +311,8 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ scale: currentScale })
+            }).catch(() => {
+                // Ignorar erros de fetch (normal quando o menu não está aberto)
             });
         }
 
